@@ -145,8 +145,8 @@ def main():
         print_banner()
         
         # Get user input
-        print(Fore.RED + "Enter host(s) to test (comma separated):" + Style.RESET_ALL)
-        print(Fore.CYAN + "Examples: whatsapp.com, youtube.com, facebook.com" + Style.RESET_ALL)
+        print(Fore.GREEN + "Enter host(s) to test (comma separated):" + Style.RESET_ALL)
+        print(Fore.MAGENTA + "Examples: whatsapp.com, youtube.com, facebook.com" + Style.RESET_ALL)
         print(Fore.CYAN + "> " + Style.RESET_ALL, end="")
         input_str = input().strip()
         
