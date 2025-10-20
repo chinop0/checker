@@ -99,11 +99,11 @@ def print_banner():
             ░  ░  ░       ░     ░ ░    
                    ░        
     """ + Style.RESET_ALL)
-    print(Fore.WHITE + "★" * 65)
-    print(Fore.YELLOW + "Proxy Tester".center(65))
+    print(Fore.GREEN + "★" * 65)
+    print(Fore.YELLOW + "🅿🆁🅾🆇🆈 🆃🅴🆂🆃🅴🆁".center(65))
     print(Fore.RED + "★" * 65)
     print(Fore.CYAN + f"Using Proxy: {PROXY_HOST}:{PROXY_PORT}".center(65))
-    print(Fore.GREEN + "★" * 65 + Style.RESET_ALL)
+    print(Fore.WHITE + "★" * 65 + Style.RESET_ALL)
     print()
 
 def print_host_result(host, response, connect_time, success):
