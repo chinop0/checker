@@ -100,7 +100,7 @@ def print_banner():
                    ░        
     """ + Style.RESET_ALL)
     print(Fore.YELLOW + "=" * 65)
-    print(Fore.LIME + "Proxy Tester".center(65))
+    print(Fore.GREEN + "Proxy Tester".center(65))
     print(Fore.YELLOW + "=" * 65)
     print(Fore.CYAN + f"Using Proxy: {PROXY_HOST}:{PROXY_PORT}".center(65))
     print(Fore.YELLOW + "=" * 65 + Style.RESET_ALL)
@@ -145,8 +145,8 @@ def main():
         print_banner()
         
         # Get user input
-        print(Fore.AQUA + "Enter host(s) to test (comma separated):" + Style.RESET_ALL)
-        print(Fore.LIME + "Examples: whatsapp.com, youtube.com, facebook.com" + Style.RESET_ALL)
+        print(Fore.GREEN + "Enter host(s) to test (comma separated):" + Style.RESET_ALL)
+        print(Fore.MAGENTA + "Examples: whatsapp.com, youtube.com, facebook.com" + Style.RESET_ALL)
         print(Fore.CYAN + "> " + Style.RESET_ALL, end="")
         input_str = input().strip()
         
