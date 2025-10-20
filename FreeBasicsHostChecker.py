@@ -76,7 +76,7 @@ def test_host(host):
 
 def print_banner():
     """Print the application banner"""
-    print(Fore.GOLD + r"""
+    print(Fore.CYAN + r"""
     
   ▄████  ▒█████   ██▓    ▓█████▄ ▓█████  ███▄    █     ██░ ██  ███▄ ▄███▓▒███████▒
  ██▒ ▀█▒▒██▒  ██▒▓██▒    ▒██▀ ██▌▓█   ▀  ██ ▀█   █    ▓██░ ██▒▓██▒▀█▀ ██▒▒ ▒ ▒ ▄▀░
@@ -92,7 +92,7 @@ def print_banner():
     print(Fore.YELLOW + "=" * 65)
     print(Fore.MAGENTA + "Proxy Tester".center(65))
     print(Fore.YELLOW + "=" * 65)
-    print(Fore.GOLD + f"Using Proxy: {PROXY_HOST}:{PROXY_PORT}".center(65))
+    print(Fore.CYAN + f"Using Proxy: {PROXY_HOST}:{PROXY_PORT}".center(65))
     print(Fore.YELLOW + "=" * 65 + Style.RESET_ALL)
     print()
 
